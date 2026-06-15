@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <script>
+        // 获取 channel 参数并设置背景
+        function getChannelParam() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('channel') || '0';
+        }
+
+        // 获取 istest 参数
+        function getIsTestParam() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('istest') || '0';
+        }
+
+        function getInviteidParam() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('inviteid') || '';
+        }
+
+
+        function setCookie(name, value, daysToLive = 365) {
+            const date = new Date();
+            date.setTime(date.getTime() + (daysToLive * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = `${name}=${encodeURIComponent(value)}; ${expires}; path=/; SameSite=Lax`;
+        }
+
+    </script>
+    <script src="./boot.js" charset="utf-8"></script>
+    <script>
+        if (typeof window.boot === "function") {
+            window.boot();
+        } else {
+            document.addEventListener("DOMContentLoaded", function() {
+                if (typeof window.boot === "function") {
+                    window.boot();
+                }
+            });
+        }
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <meta name="theme-color" content="#ffffff">
+    <link id="manifest-link" rel="manifest" >
+    <script>
+        // 根据 channel 参数设置 manifest 链接
+        (function() {
+            var channel = getChannelParam();
+            //打印channel
+            console.log("channel:", channel);
+            var manifestLink = document.getElementById('manifest-link');
+            if(getIsTestParam() === '1'){
+                //测试版
+                manifestLink.href = `manifest/${channel}/installmanifest_test.json`;
+            }else{
+                manifestLink.href = `manifest/${channel}/installmanifest.json`;
+            }
+            
+        })();
+    </script>
+    <style>
+        body {
+            min-height: 100vh;
+            background: var(--image-url) no-repeat center center fixed;
+            background-size: cover;
+        }
+        #install-btn {
+            display: block;
+            position: fixed;
+            left: 50%;
+            top: 80%;
+            transform: translate(-50%, -50%);
+            width: 60vw;
+            max-width: 323px;
+            min-width: 180px;
+            height: 12vw;
+            max-height: 78px;
+            min-height: 44px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 4vw;
+            text-align: center;
+            background: url('./installbtn.png') no-repeat center center;
+            background-size: cover;
+        }
+        #ios-install-guide {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 1) url('./installiosguide.jpg') no-repeat center center;
+            background-size: contain;
+            justify-content: center;
+            align-items: center;
+        }
+        #ios-install-guide img {
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
+            background-size: contain;
+        }
+        /* 微信浏览器提示样式 */
+        #wechat-tip {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            max-width: 80vw;
+            line-height: 1.5;
+        }
+        #wechat-tip-close {
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+        }
+    </style>
+    <script>
+        //先保存链接上的参数
+        const params = new URLSearchParams(window.location.search);
+        localStorage.setItem("dwc_url_params", params);
+
+        document.documentElement.style.setProperty(
+            '--image-url',
+            `url('./channel_change_img/${getChannelParam()}/splash.jpg')`
+        );
+
+        let deferredPrompt = null;
+
+        function isWindows() {
+            return navigator.platform.startsWith('Win');
+        }
+
+        function isAndroid() {
+            return /Android/i.test(navigator.userAgent);
+        }
+        function isIOS() {
+            return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        }
+        function isSafari() {
+            return isIOS() && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS/.test(navigator.userAgent);
+        }
+        function isStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+        }
+        function isWeChat() {
+            return /micromessenger/i.test(navigator.userAgent);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const installBtn = document.getElementById("install-btn");
+            const iosInstallGuide = document.getElementById("ios-install-guide");
+            const wechatTip = document.getElementById("wechat-tip");
+
+            // 微信浏览器提示
+            if (isWeChat()) {
+                wechatTip.style.display = "block";
+            }
+
+            // 关闭微信提示
+            const wechatTipClose = document.getElementById("wechat-tip-close");
+            if (wechatTipClose) {
+                wechatTipClose.onclick = function() {
+                    wechatTip.style.display = "none";
+                };
+            }
+
+            // 先显示按钮
+            installBtn.style.display = "block";
+
+            // 微信浏览器隐藏按钮
+            if (isWeChat()) {
+                installBtn.style.display = "none";
+            }
+
+
+            // Android PWA 安装
+            window.addEventListener("beforeinstallprompt", (e) => {
+                if (isAndroid() && !isStandalone()) {
+                    e.preventDefault();
+                    deferredPrompt = e;
+                }
+            });
+
+            installBtn.addEventListener("click", () => {
+                if ((isAndroid() || isWindows()) && deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(() => {
+                        deferredPrompt = null;
+                        installBtn.style.display = "none";
+                    });
+                    return;
+                }
+
+                if (isAndroid() || isWindows()) {
+                    alert('请点击 Chrome 右上角菜单，选择“添加到主屏幕”或“安装应用”。');
+                    return;
+
+                    //去打开
+                    fetch('M_ChannelApkUrlCFG.json?rand=' + Math.random())
+                        .then(response => response.json())
+                        .then(cfg => {
+                            const channel = getChannelParam();
+                            // 遍历 cfg，查找 channel 匹配的 ApkUrl
+                            let apkUrl = '';
+                            let umKey = '';
+                            let openinstall = '';
+                            for (const key in cfg) {
+                                if (cfg[key].ID === channel) {
+                                    apkUrl = cfg[key].ApkUrl;
+                                    umKey = cfg[key].Umkey;
+                                    openinstall = cfg[key].Openinstalkey;
+                                    break;
+                                }
+                            }
+
+                            if (apkUrl) {
+                                //打印
+                                console.log("apkUrl:", apkUrl);
+                                if(umKey == '' && openinstall == ''){
+                                    //没有umkey和openinstallkey
+                                    console.log("没有umkey和openinstallkey");
+                                    window.location.href = apkUrl;
+                                }else{
+                                    //https请求 invite.do
+                                    var baseUrl = "https://mgcgame.ycwebgame.com/JinBiTuiTuiLe_Web/invite.do";
+                                    if(Number(channel) >= 1000){
+                                       baseUrl = "https://mgcgame.datukeji.cn/JinBiTuiTuiLe_Web/invite.do";
+                                    }else if(Number(channel) > 3000){
+                                       baseUrl = "https://mgcgame.superchangyou.com/JinBiTuiTuiLe_Web/invite.do";
+                                    }
+                                    
+                                    //inviteid=1137827
+                                    // 拼接参数 ${channel} ${inviteid}
+                                    const inviteid = getInviteidParam();
+                                    let url = baseUrl + `?channel=` + channel;
+                                    if (inviteid) {
+                                        url += `&userCode=` + inviteid;
+                                    }
+                                    console.log(url);
+                                    fetch(url)
+                                        .then(res => res.json())
+                                        .then(data => {
+                                            // 可根据需要处理返回数据
+                                            console.log('invite.do 返回:', data);
+                                            if(data.data.url && data.data.url !== ''){
+                                                var shareUrl = data.data.url + "?inviteid=" + inviteid
+                                                                                + "&uid=" + inviteid
+                                                                                + "&umlinkid=" + umKey;
+                                                
+                                                window.location.href = shareUrl;
+                                            }
+                                        })
+                                        .catch(err => {
+                                            console.error('invite.do 请求失败:', err);
+                                            
+                                            var shareUrl = "https://down.yuch188.com/test/dwcindex.html" + "?inviteid=" + inviteid 
+                                                                                + "&uid=" + inviteid
+                                                                                + "&umlinkid=" + umKey;
+                                                // 可根据需要使用 shareUrl，例如跳转
+                                            window.location.href = shareUrl;
+                                            
+                                        });
+
+                                }
+                            } else {
+                                alert('未找到对应渠道的安装包地址');
+                            }
+                        })
+                        .catch(() => {
+                            alert('获取安装包地址失败');
+                        });
+
+                } else if (isIOS()) {
+                    // 保存 inviteid 到 localStorage（如果有）
+                    const inviteid = getInviteidParam();
+                    const channel = getChannelParam();
+                    if (inviteid && inviteid !== '') {
+                        //localStorage.setItem(channel + "inviteid", inviteid);
+                        setCookie(channel + "inviteid", inviteid, 365);
+                    }
+
+                    iosInstallGuide.style.display = "flex";
+                    // 可选：点击遮罩关闭引导
+                    iosInstallGuide.addEventListener("click", () => {
+                        iosInstallGuide.style.display = "none";
+                    }, { once: true });
+                } else {
+                    //其他平台可自定义处理
+
+
+                   
+                }
+            });
+
+            // 注册 Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(() => console.log("Service Worker 注册成功"))
+                    .catch(err => console.error("Service Worker 注册失败", err));
+            }
+        });
+    </script>
+</head>
+<body>
+    <button id="install-btn"></button>
+    <div id="ios-install-guide"></div>
+    <div id="wechat-tip">
+        <span id="wechat-tip-close">&times;</span>
+        请点击右上角 <b>···</b>，选择“在浏览器中打开”。
+    </div>
+</body>
+</html>

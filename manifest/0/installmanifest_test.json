@@ -1,0 +1,22 @@
+{
+  "name": "game",
+  "short_name": "game",
+  "start_url": "http://192.168.1.30:8080/index.html?channel=0&logintype=1&istest=1",
+  "scope": "http://192.168.1.30:8080/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "../../icons/0/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "../../icons/0/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
