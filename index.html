@@ -1,0 +1,155 @@
+
+
+<!DOCTYPE html>
+<html>
+    <script>
+        function setCookie(name, value, daysToLive = 365) {
+            const date = new Date();
+            date.setTime(date.getTime() + (daysToLive * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = `${name}=${encodeURIComponent(value)}; ${expires}; path=/; SameSite=Lax`;
+        }
+
+        function getCookie(name) {
+            const cookieString = decodeURIComponent(document.cookie);
+            const cookies = cookieString.split('; ');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].split('=');
+                if (cookie[0] === name) {
+                    return cookie[1] || '';
+                }
+            }
+            return null;
+        }
+
+        function deleteCookie(name) {
+            setCookie(name, "", -1); // 设置过期时间为过去
+        }
+
+    </script>
+
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="full-screen" content="true" />
+    <meta name="screen-orientation" content="portrait" />
+    <meta name="x5-fullscreen" content="true" />
+    <meta name="360-fullscreen" content="true" />
+    <meta name="apple-mobile-web-app-title" content="Gaple Gila-Gilaan">
+    <link rel="shortcut icon" href="./favicon.ico" />
+    <style>
+        html, body {
+            -ms-touch-action: none;
+            background: #000000;
+            padding: 0;
+            border: 0;
+            margin: 0;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+
+<iframe id="gameFrame" src="#" width="100%" height="100%" style="border:none;vertical-align:top;"></iframe>
+<script>
+
+
+    let oriUrl = '';
+    let PwaUrl = '';
+    window.addEventListener('message', function(event) {
+        var result = event.data;
+        if (result.success){
+            console.log('最顶消息');
+            // 在新窗口中打开 pay_url
+            if (result.pay_url) {
+                // 这里可以使用 window.open() 打开新的窗口
+                // 例如：window.open(result.pay_url, '_blank');
+                console.log('pay_url:', result.pay_url);
+                window.open(result.pay_url, '_blank');
+            }
+
+            // 保存 user_login_code 到 localStorage（如果有）
+            if (result.user_login_code && result.channel) {
+                localStorage.setItem(result.channel + "user_login_code", result.user_login_code);
+            }
+
+            //remove_token
+            if (result.remove_token) {
+                const params = new URLSearchParams(window.location.search);
+                let channel = params.get('channel') || '0';
+
+                localStorage.removeItem(channel + "user_login_code");
+                //然后怎么重新刷新iframe
+                document.getElementById("gameFrame").src = oriUrl;    }
+
+            //删除removeInviteid
+            if (result.removeInviteid) {
+                const params = new URLSearchParams(window.location.search);
+                let channel = params.get('channel') || '0';
+                deleteCookie(channel + 'inviteid');
+            }
+        }
+    }); 
+
+
+    console.log("DOMContentLoaded0");
+    document.addEventListener("DOMContentLoaded", () => {
+        console.log('test', "DOMContentLoaded1");
+
+        fetch('M_ChannelApkUrlCFG.json?rand=' + Math.random())
+        .then(response => response.json())
+        .then(cfg => {
+            console.log('test', "DOMContentLoaded2");
+            function getChannelParam() {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('channel') || '0';
+            }
+            const params = new URLSearchParams(window.location.search);
+            const channel = getChannelParam();
+            
+            for (const key in cfg) {
+                if (cfg[key].ID === channel) {
+                    const isTest = params.get('istest') === '1';
+                    PwaUrl = isTest ? cfg[key].PwaTestUrl : cfg[key].PwaUrl;
+                    PwaUrl = PwaUrl.replace('%s', channel);
+                    oriUrl = PwaUrl;
+                    break;
+                }
+            }
+            
+            if (PwaUrl) {
+                console.log("游戏地址===",PwaUrl)
+                let user_login_code = localStorage.getItem(channel + "user_login_code");
+                let inviteid = getCookie(channel + "inviteid");
+
+                setTimeout(function() {
+                    const gameUrl = new URL(PwaUrl, window.location.href);
+                    gameUrl.searchParams.set('user_login_code', user_login_code || '');
+                    gameUrl.searchParams.set('inviteid', inviteid || '');
+                    gameUrl.searchParams.set('t', Date.now());
+                    document.getElementById("gameFrame").src = gameUrl.toString();
+                }, 1);
+
+
+
+            }else {
+                console.log('未找到对应渠道的安装包地址');
+            }
+        })
+        .catch(() => {
+            console.log('获取安装包地址失败');
+        });
+        
+    });
+
+
+
+</script>
+</body>
+
+</html>
+

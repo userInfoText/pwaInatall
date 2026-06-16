@@ -88,6 +88,11 @@
             background: url('./installbtn.png') no-repeat center center;
             background-size: cover;
         }
+        #install-btn:disabled {
+            cursor: default;
+            opacity: 0.75;
+            pointer-events: none;
+        }
         #ios-install-guide {
             display: none;
             position: fixed;
@@ -145,6 +150,7 @@
         );
 
         let deferredPrompt = null;
+        let installStarted = false;
 
         function isWindows() {
             return navigator.platform.startsWith('Win');
@@ -196,16 +202,25 @@
 
             // Android PWA 安装
             window.addEventListener("beforeinstallprompt", (e) => {
-                if (isAndroid() && !isStandalone()) {
+                if (isAndroid() && !isStandalone() && !installStarted) {
                     e.preventDefault();
                     deferredPrompt = e;
                 }
             });
 
             installBtn.addEventListener("click", () => {
+                if (installStarted) {
+                    return;
+                }
+
                 if ((isAndroid() || isWindows()) && deferredPrompt) {
+                    installStarted = true;
+                    installBtn.disabled = true;
                     deferredPrompt.prompt();
                     deferredPrompt.userChoice.then(() => {
+                        deferredPrompt = null;
+                        installBtn.style.display = "none";
+                    }).catch(() => {
                         deferredPrompt = null;
                         installBtn.style.display = "none";
                     });
@@ -243,13 +258,7 @@
                                     window.location.href = apkUrl;
                                 }else{
                                     //https请求 invite.do
-                                    var baseUrl = "https://mgcgame.ycwebgame.com/JinBiTuiTuiLe_Web/invite.do";
-                                    if(Number(channel) >= 1000){
-                                       baseUrl = "https://mgcgame.datukeji.cn/JinBiTuiTuiLe_Web/invite.do";
-                                    }else if(Number(channel) > 3000){
-                                       baseUrl = "https://mgcgame.superchangyou.com/JinBiTuiTuiLe_Web/invite.do";
-                                    }
-                                    
+                                    var baseUrl = "https://";
                                     //inviteid=1137827
                                     // 拼接参数 ${channel} ${inviteid}
                                     const inviteid = getInviteidParam();
@@ -273,12 +282,7 @@
                                         })
                                         .catch(err => {
                                             console.error('invite.do 请求失败:', err);
-                                            
-                                            var shareUrl = "https://down.yuch188.com/test/dwcindex.html" + "?inviteid=" + inviteid 
-                                                                                + "&uid=" + inviteid
-                                                                                + "&umlinkid=" + umKey;
-                                                // 可根据需要使用 shareUrl，例如跳转
-                                            window.location.href = shareUrl;
+                                
                                             
                                         });
 
@@ -292,6 +296,8 @@
                         });
 
                 } else if (isIOS()) {
+                    installStarted = true;
+                    installBtn.disabled = true;
                     // 保存 inviteid 到 localStorage（如果有）
                     const inviteid = getInviteidParam();
                     const channel = getChannelParam();
@@ -311,6 +317,13 @@
 
                    
                 }
+            });
+
+            window.addEventListener("appinstalled", () => {
+                installStarted = true;
+                deferredPrompt = null;
+                installBtn.disabled = true;
+                installBtn.style.display = "none";
             });
 
             // 注册 Service Worker
