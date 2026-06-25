@@ -31,35 +31,539 @@
 <head>
     <meta charset="utf-8">
     <title></title>
-    <meta name="viewport" content="width=device-width,initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width,initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="full-screen" content="true" />
-    <meta name="screen-orientation" content="portrait" />
     <meta name="x5-fullscreen" content="true" />
     <meta name="360-fullscreen" content="true" />
     <meta name="apple-mobile-web-app-title" content="Gaple Gila-Gilaan">
     <link rel="shortcut icon" href="./favicon.ico" />
     <style>
-        html, body {
+        html {
             -ms-touch-action: none;
+            touch-action: none;
             background: #000000;
             padding: 0;
             border: 0;
             margin: 0;
-            height: 100%;
+            width: var(--pwa-view-width, 100%);
+            height: var(--pwa-view-height, 100%);
+            min-height: var(--pwa-view-height, 100%);
+            overflow: hidden;
+            overscroll-behavior: none;
         }
+
+        body {
+            -ms-touch-action: none;
+            touch-action: none;
+            background: #000000;
+            padding: 0;
+            border: 0;
+            margin: 0;
+            width: var(--pwa-view-width, 100%);
+            height: var(--pwa-view-height, 100%);
+            min-height: var(--pwa-view-height, 100%);
+            overflow: hidden;
+            overscroll-behavior: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        #gameHost {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--pwa-view-width, 100%);
+            height: var(--pwa-view-height, 100%);
+            overflow: hidden;
+            background: #000000;
+            transform-origin: center center;
+        }
+
+        html.pwa-portrait-host #gameHost {
+            top: 50%;
+            left: 50%;
+            right: auto;
+            bottom: auto;
+            width: var(--pwa-view-height, 100%);
+            height: var(--pwa-view-width, 100%);
+            transform: translate(-50%, -50%) rotate(90deg);
+        }
+
+        #gameFrame {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            vertical-align: top;
+            background: #000000;
+        }
+
+        #pwaDebug {
+            position: fixed;
+            top: 6px;
+            left: 6px;
+            z-index: 2147483647;
+            max-width: 70%;
+            padding: 6px 8px;
+            color: #00ff66;
+            background: rgba(0, 0, 0, 0.78);
+            border: 1px solid rgba(0, 255, 102, 0.55);
+            font: 11px/1.35 monospace;
+            white-space: pre-wrap;
+            pointer-events: none;
+        }
+
+        .safeProbe {
+            position: fixed;
+            top: 0;
+            left: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #safeTopProbe {
+            height: env(safe-area-inset-top, 0px);
+        }
+
+        #safeRightProbe {
+            width: env(safe-area-inset-right, 0px);
+        }
+
+        #safeBottomProbe {
+            height: env(safe-area-inset-bottom, 0px);
+        }
+
+        #safeLeftProbe {
+            width: env(safe-area-inset-left, 0px);
+        }
+
     </style>
 </head>
 
 <body>
 
+<div id="gameHost"></div>
+<div id="pwaDebug"></div>
+<div id="safeTopProbe" class="safeProbe"></div>
+<div id="safeRightProbe" class="safeProbe"></div>
+<div id="safeBottomProbe" class="safeProbe"></div>
+<div id="safeLeftProbe" class="safeProbe"></div>
 
-<iframe id="gameFrame" src="#" width="100%" height="100%" style="border:none;vertical-align:top;"></iframe>
 <script>
-
-
     let oriUrl = '';
     let PwaUrl = '';
+    let resizeKickTimerIds = [];
+    let viewportModeTimerIds = [];
+    let relayoutTimerIds = [];
+    let shellRelayoutActive = false;
+    let gameFrame = null;
+    let bootState = "starting";
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    const viewportMetaContent = viewportMeta ? viewportMeta.getAttribute("content") : "";
+
+    function updateAppViewportSize() {
+        updateHostViewportMode();
+        kickGameResize();
+    }
+
+    function updateHostViewportMode() {
+        const viewport = getViewportState();
+        const safeTop = getProbeMetric("safeTopProbe", "height");
+        const safeRight = getProbeMetric("safeRightProbe", "width");
+        const safeBottom = getProbeMetric("safeBottomProbe", "height");
+        const safeLeft = getProbeMetric("safeLeftProbe", "width");
+        const viewWidth = viewport.visualWidth || viewport.layoutWidth;
+        const viewHeight = viewport.visualHeight || viewport.layoutHeight;
+        const isPortraitHost = viewHeight > viewWidth;
+
+        document.documentElement.style.setProperty("--pwa-view-width", `${viewWidth}px`);
+        document.documentElement.style.setProperty("--pwa-view-height", `${viewHeight}px`);
+        document.documentElement.style.setProperty("--pwa-safe-top", `${safeTop}px`);
+        document.documentElement.style.setProperty("--pwa-safe-right", `${safeRight}px`);
+        document.documentElement.style.setProperty("--pwa-safe-bottom", `${safeBottom}px`);
+        document.documentElement.style.setProperty("--pwa-safe-left", `${safeLeft}px`);
+        document.documentElement.classList.toggle("pwa-portrait-host", isPortraitHost);
+        document.documentElement.classList.toggle("pwa-landscape-host", !isPortraitHost);
+    }
+
+    function refreshViewportMeta() {
+        if (!viewportMeta || !viewportMetaContent) {
+            return;
+        }
+        viewportMeta.setAttribute("content", `${viewportMetaContent},shrink-to-fit=no`);
+        document.documentElement.getBoundingClientRect();
+        requestAnimationFrame(function() {
+            viewportMeta.setAttribute("content", viewportMetaContent);
+        });
+    }
+
+    function forceShellRelayout() {
+        refreshViewportMeta();
+        updateHostViewportMode();
+
+        const gameHost = document.getElementById("gameHost");
+        if (gameHost) {
+            gameHost.getBoundingClientRect();
+        }
+        if (gameFrame) {
+            gameFrame.getBoundingClientRect();
+        }
+
+        kickGameResize();
+    }
+
+    function kickShellRelayout() {
+        if (shellRelayoutActive) {
+            return;
+        }
+        shellRelayoutActive = true;
+        relayoutTimerIds.forEach(function(timerId) {
+            clearTimeout(timerId);
+        });
+        const delays = [0, 50, 120, 240, 500, 900, 1400, 2200, 3200];
+        relayoutTimerIds = delays.map(function(delay, index) {
+            return setTimeout(function() {
+                forceShellRelayout();
+                if (index === delays.length - 1) {
+                    shellRelayoutActive = false;
+                }
+            }, delay);
+        });
+    }
+
+    function kickHostViewportMode() {
+        viewportModeTimerIds.forEach(function(timerId) {
+            clearTimeout(timerId);
+        });
+        viewportModeTimerIds = [0, 60, 120, 250, 500, 1000, 1600].map(function(delay) {
+            return setTimeout(function() {
+                updateHostViewportMode();
+                kickGameResize();
+            }, delay);
+        });
+    }
+
+    function postResizeKick() {
+        if (gameFrame && gameFrame.contentWindow) {
+            const rect = gameFrame.getBoundingClientRect();
+            const width = Math.round(gameFrame.clientWidth || rect.width || window.innerWidth || 0);
+            const height = Math.round(gameFrame.clientHeight || rect.height || window.innerHeight || 0);
+            syncInnerGameSize(width, height);
+            gameFrame.contentWindow.postMessage({
+                type: "pwa-resize",
+                width: width,
+                height: height
+            }, "*");
+            try {
+                gameFrame.contentWindow.dispatchEvent(new Event("resize"));
+                gameFrame.contentWindow.dispatchEvent(new Event("orientationchange"));
+            } catch (error) {}
+        }
+    }
+
+    function syncInnerGameSize(width, height) {
+        if (!gameFrame || !gameFrame.contentDocument || !width || !height) {
+            return;
+        }
+
+        try {
+            const doc = gameFrame.contentDocument;
+            const sizeStyle = `width:${width}px;height:${height}px;min-width:${width}px;min-height:${height}px;`;
+            [doc.documentElement, doc.body].forEach(function(element) {
+                if (element) {
+                    element.style.cssText += `;margin:0;overflow:hidden;${sizeStyle}`;
+                }
+            });
+            ["GameDiv", "Cocos3dGameContainer", "GameCanvas"].forEach(function(id) {
+                const element = doc.getElementById(id);
+                if (element) {
+                    element.style.cssText += `;display:block;margin:0;padding:0;${sizeStyle}`;
+                }
+            });
+
+            const canvas = doc.getElementById("GameCanvas");
+            if (canvas) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+        } catch (error) {}
+    }
+
+    function kickGameResize() {
+        resizeKickTimerIds.forEach(function(timerId) {
+            clearTimeout(timerId);
+        });
+        resizeKickTimerIds = [0, 80, 200, 500, 1000, 1600].map(function(delay) {
+            return setTimeout(postResizeKick, delay);
+        });
+    }
+
+    window.addEventListener("resize", kickGameResize);
+    window.addEventListener("orientationchange", kickGameResize);
+    window.addEventListener("resize", updateAppViewportSize);
+    window.addEventListener("orientationchange", updateAppViewportSize);
+    window.addEventListener("resize", kickShellRelayout);
+    window.addEventListener("orientationchange", kickShellRelayout);
+    window.addEventListener("pageshow", kickShellRelayout);
+    document.addEventListener("visibilitychange", kickShellRelayout);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", kickGameResize);
+        window.visualViewport.addEventListener("resize", updateAppViewportSize);
+        window.visualViewport.addEventListener("resize", kickShellRelayout);
+        window.visualViewport.addEventListener("scroll", kickShellRelayout);
+    }
+
+    kickShellRelayout();
+
+    function getViewportState() {
+        const doc = document.documentElement;
+        const visualViewport = window.visualViewport;
+        const layoutWidth = Math.round(window.innerWidth || doc.clientWidth || 0);
+        const layoutHeight = Math.round(window.innerHeight || doc.clientHeight || 0);
+        const visualWidth = Math.round(visualViewport ? visualViewport.width : layoutWidth);
+        const visualHeight = Math.round(visualViewport ? visualViewport.height : layoutHeight);
+
+        return {
+            layoutWidth,
+            layoutHeight,
+            visualWidth,
+            visualHeight,
+            key: `${layoutWidth}x${layoutHeight}:${visualWidth}x${visualHeight}`
+        };
+    }
+
+    function getProbeMetric(id, metric) {
+        const probe = document.getElementById(id);
+        if (!probe) {
+            return 0;
+        }
+        const rect = probe.getBoundingClientRect();
+        return Math.round(rect[metric] || 0);
+    }
+
+    function formatElementSize(element) {
+        if (!element) {
+            return "-";
+        }
+        const rect = element.getBoundingClientRect();
+        return [
+            Math.round(element.clientWidth || 0),
+            "x",
+            Math.round(element.clientHeight || 0),
+            " r",
+            Math.round(rect.width || 0),
+            "x",
+            Math.round(rect.height || 0)
+        ].join("");
+    }
+
+    function getInnerCanvasSize() {
+        if (!gameFrame || !gameFrame.contentDocument) {
+            return "-";
+        }
+        try {
+            const canvas = gameFrame.contentDocument.getElementById("GameCanvas");
+            return formatElementSize(canvas);
+        } catch (error) {
+            return "blocked";
+        }
+    }
+
+    function updatePwaDebug() {
+        const debug = document.getElementById("pwaDebug");
+        if (!debug) {
+            return;
+        }
+        const viewport = getViewportState();
+        const gameHost = document.getElementById("gameHost");
+        const orientationType = screen.orientation && screen.orientation.type ? screen.orientation.type : "";
+        const angle = typeof window.orientation === "number" ? window.orientation : "";
+        const safeTop = getProbeMetric("safeTopProbe", "height");
+        const safeRight = getProbeMetric("safeRightProbe", "width");
+        const safeBottom = getProbeMetric("safeBottomProbe", "height");
+        const safeLeft = getProbeMetric("safeLeftProbe", "width");
+
+        debug.textContent = [
+            `inner ${viewport.layoutWidth}x${viewport.layoutHeight}`,
+            `visual ${viewport.visualWidth}x${viewport.visualHeight}`,
+            `screen ${screen.width}x${screen.height}`,
+            `ori ${orientationType || "-"} ${angle}`,
+            `safe T${safeTop} R${safeRight} B${safeBottom} L${safeLeft}`,
+            `host ${document.documentElement.classList.contains("pwa-portrait-host") ? "rotated" : "native"}`,
+            `boot ${bootState}`,
+            `hostSize ${formatElementSize(gameHost)}`,
+            `frameSize ${formatElementSize(gameFrame)}`,
+            `canvasSize ${getInnerCanvasSize()}`
+        ].join("\n");
+    }
+
+    setInterval(updatePwaDebug, 300);
+    window.addEventListener("resize", updatePwaDebug);
+    window.addEventListener("orientationchange", updatePwaDebug);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", updatePwaDebug);
+    }
+    updatePwaDebug();
+
+    if (window.ResizeObserver) {
+        const shellResizeObserver = new ResizeObserver(function() {
+            updateHostViewportMode();
+            kickGameResize();
+        });
+        shellResizeObserver.observe(document.documentElement);
+        shellResizeObserver.observe(document.body);
+        shellResizeObserver.observe(document.getElementById("gameHost"));
+    }
+
+    function getGameHostState() {
+        updateHostViewportMode();
+
+        const gameHost = document.getElementById("gameHost");
+        const viewport = getViewportState();
+        const orientationType = screen.orientation && screen.orientation.type ? screen.orientation.type : "";
+        const angle = typeof window.orientation === "number" ? window.orientation : "";
+        const width = Math.round(gameHost ? gameHost.clientWidth : viewport.layoutWidth);
+        const height = Math.round(gameHost ? gameHost.clientHeight : viewport.layoutHeight);
+
+        return {
+            width,
+            height,
+            key: `${width}x${height}:${viewport.key}:${orientationType}:${angle}`
+        };
+    }
+
+    function waitForStableGameHost(timeoutMs = 2200, stableMs = 220) {
+        return new Promise(function(resolve) {
+            const startedAt = Date.now();
+            let stableKey = "";
+            let stableStartedAt = 0;
+            let checkTimer = 0;
+            let resolved = false;
+
+            function cleanup() {
+                clearTimeout(checkTimer);
+                window.removeEventListener("resize", scheduleCheck);
+                window.removeEventListener("orientationchange", scheduleCheck);
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener("resize", scheduleCheck);
+                }
+            }
+
+            function finish() {
+                if (resolved) {
+                    return;
+                }
+                resolved = true;
+                cleanup();
+                resolve();
+            }
+
+            function check() {
+                const now = Date.now();
+                const host = getGameHostState();
+
+                updateHostViewportMode();
+                bootState = host.width > host.height ? "host-settling" : "waiting-host";
+
+                if (host.key !== stableKey) {
+                    stableKey = host.key;
+                    stableStartedAt = now;
+                }
+
+                if (host.width > host.height && now - stableStartedAt >= stableMs) {
+                    bootState = "loading-game";
+                    finish();
+                    return;
+                }
+
+                if (now - startedAt >= timeoutMs) {
+                    bootState = "loading-game-timeout";
+                    finish();
+                    return;
+                }
+
+                checkTimer = setTimeout(check, 50);
+            }
+
+            function scheduleCheck() {
+                clearTimeout(checkTimer);
+                checkTimer = setTimeout(check, 50);
+            }
+
+            window.addEventListener("resize", scheduleCheck);
+            window.addEventListener("orientationchange", scheduleCheck);
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener("resize", scheduleCheck);
+            }
+            check();
+        });
+    }
+
+    function openGameUrl(gameUrl) {
+        if (gameFrame) {
+            gameFrame.remove();
+        }
+        bootState = "game-loaded";
+
+        const gameHost = document.getElementById("gameHost");
+        gameFrame = document.createElement("iframe");
+        gameFrame.id = "gameFrame";
+        gameFrame.width = "100%";
+        gameFrame.height = "100%";
+        gameFrame.allowFullscreen = true;
+        gameFrame.addEventListener("load", kickGameResize);
+        gameHost.appendChild(gameFrame);
+
+        requestAnimationFrame(function() {
+            setTimeout(function() {
+                updateHostViewportMode();
+                gameFrame.src = gameUrl.toString();
+                kickGameResize();
+            }, 100);
+        });
+    }
+
+    function openGameUrlAfterHostSettles(gameUrl) {
+        const delays = [0, 120, 300, 600, 1000];
+        let lastKey = "";
+        let stableCount = 0;
+
+        function tick(index) {
+            const viewport = getViewportState();
+            const orientationType = screen.orientation && screen.orientation.type ? screen.orientation.type : "";
+            const angle = typeof window.orientation === "number" ? window.orientation : "";
+            const key = `${viewport.key}:${orientationType}:${angle}`;
+
+            if (key === lastKey) {
+                stableCount += 1;
+            } else {
+                lastKey = key;
+                stableCount = 0;
+            }
+
+            if (stableCount >= 2 || index >= delays.length) {
+                openGameUrl(gameUrl);
+                return;
+            }
+
+            setTimeout(function() {
+                tick(index + 1);
+            }, delays[index] || 250);
+        }
+
+        tick(0);
+        kickGameResize();
+    }
+
     window.addEventListener('message', function(event) {
         var result = event.data;
         if (result.success){
@@ -126,13 +630,13 @@
                 let user_login_code = localStorage.getItem(channel + "user_login_code");
                 let inviteid = getCookie(channel + "inviteid");
 
-                setTimeout(function() {
+                waitForStableGameHost().then(function() {
                     const gameUrl = new URL(PwaUrl, window.location.href);
                     gameUrl.searchParams.set('user_login_code', user_login_code || '');
                     gameUrl.searchParams.set('inviteid', inviteid || '');
                     gameUrl.searchParams.set('t', Date.now());
-                    document.getElementById("gameFrame").src = gameUrl.toString();
-                }, 1);
+                    openGameUrlAfterHostSettles(gameUrl);
+                });
 
 
 
