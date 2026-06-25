@@ -35,6 +35,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="screen-orientation" content="landscape" />
+    <meta name="x5-orientation" content="landscape" />
     <meta name="full-screen" content="true" />
     <meta name="x5-fullscreen" content="true" />
     <meta name="360-fullscreen" content="true" />
@@ -181,9 +184,15 @@
         const safeRight = getProbeMetric("safeRightProbe", "width");
         const safeBottom = getProbeMetric("safeBottomProbe", "height");
         const safeLeft = getProbeMetric("safeLeftProbe", "width");
-        const viewWidth = viewport.visualWidth || viewport.layoutWidth;
-        const viewHeight = viewport.visualHeight || viewport.layoutHeight;
+        let viewWidth = viewport.layoutWidth;
+        let viewHeight = viewport.layoutHeight;
         const isPortraitHost = viewHeight > viewWidth;
+        const screenShortSide = Math.min(screen.width || 0, screen.height || 0);
+        const screenLongSide = Math.max(screen.width || 0, screen.height || 0);
+
+        if (isPortraitHost && screenLongSide > viewHeight && screenShortSide >= viewWidth) {
+            viewHeight = screenLongSide;
+        }
 
         document.documentElement.style.setProperty("--pwa-view-width", `${viewWidth}px`);
         document.documentElement.style.setProperty("--pwa-view-height", `${viewHeight}px`);
@@ -398,6 +407,7 @@
             `screen ${screen.width}x${screen.height}`,
             `ori ${orientationType || "-"} ${angle}`,
             `safe T${safeTop} R${safeRight} B${safeBottom} L${safeLeft}`,
+            `pwaView ${getComputedStyle(document.documentElement).getPropertyValue("--pwa-view-width").trim()}x${getComputedStyle(document.documentElement).getPropertyValue("--pwa-view-height").trim()}`,
             `host ${document.documentElement.classList.contains("pwa-portrait-host") ? "rotated" : "native"}`,
             `boot ${bootState}`,
             `hostSize ${formatElementSize(gameHost)}`,
