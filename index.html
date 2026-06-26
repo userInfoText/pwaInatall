@@ -110,21 +110,6 @@
             background: #000000;
         }
 
-        #pwaDebug {
-            position: fixed;
-            top: 6px;
-            left: 6px;
-            z-index: 2147483647;
-            max-width: 70%;
-            padding: 6px 8px;
-            color: #00ff66;
-            background: rgba(0, 0, 0, 0.78);
-            border: 1px solid rgba(0, 255, 102, 0.55);
-            font: 11px/1.35 monospace;
-            white-space: pre-wrap;
-            pointer-events: none;
-        }
-
         .safeProbe {
             position: fixed;
             top: 0;
@@ -155,7 +140,6 @@
 <body>
 
 <div id="gameHost"></div>
-<div id="pwaDebug"></div>
 <div id="safeTopProbe" class="safeProbe"></div>
 <div id="safeRightProbe" class="safeProbe"></div>
 <div id="safeBottomProbe" class="safeProbe"></div>
@@ -169,7 +153,6 @@
     let relayoutTimerIds = [];
     let shellRelayoutActive = false;
     let gameFrame = null;
-    let bootState = "starting";
     const viewportMeta = document.querySelector('meta[name="viewport"]');
     const viewportMetaContent = viewportMeta ? viewportMeta.getAttribute("content") : "";
 
@@ -359,71 +342,6 @@
         return Math.round(rect[metric] || 0);
     }
 
-    function formatElementSize(element) {
-        if (!element) {
-            return "-";
-        }
-        const rect = element.getBoundingClientRect();
-        return [
-            Math.round(element.clientWidth || 0),
-            "x",
-            Math.round(element.clientHeight || 0),
-            " r",
-            Math.round(rect.width || 0),
-            "x",
-            Math.round(rect.height || 0)
-        ].join("");
-    }
-
-    function getInnerCanvasSize() {
-        if (!gameFrame || !gameFrame.contentDocument) {
-            return "-";
-        }
-        try {
-            const canvas = gameFrame.contentDocument.getElementById("GameCanvas");
-            return formatElementSize(canvas);
-        } catch (error) {
-            return "blocked";
-        }
-    }
-
-    function updatePwaDebug() {
-        const debug = document.getElementById("pwaDebug");
-        if (!debug) {
-            return;
-        }
-        const viewport = getViewportState();
-        const gameHost = document.getElementById("gameHost");
-        const orientationType = screen.orientation && screen.orientation.type ? screen.orientation.type : "";
-        const angle = typeof window.orientation === "number" ? window.orientation : "";
-        const safeTop = getProbeMetric("safeTopProbe", "height");
-        const safeRight = getProbeMetric("safeRightProbe", "width");
-        const safeBottom = getProbeMetric("safeBottomProbe", "height");
-        const safeLeft = getProbeMetric("safeLeftProbe", "width");
-
-        debug.textContent = [
-            `inner ${viewport.layoutWidth}x${viewport.layoutHeight}`,
-            `visual ${viewport.visualWidth}x${viewport.visualHeight}`,
-            `screen ${screen.width}x${screen.height}`,
-            `ori ${orientationType || "-"} ${angle}`,
-            `safe T${safeTop} R${safeRight} B${safeBottom} L${safeLeft}`,
-            `pwaView ${getComputedStyle(document.documentElement).getPropertyValue("--pwa-view-width").trim()}x${getComputedStyle(document.documentElement).getPropertyValue("--pwa-view-height").trim()}`,
-            `host ${document.documentElement.classList.contains("pwa-portrait-host") ? "rotated" : "native"}`,
-            `boot ${bootState}`,
-            `hostSize ${formatElementSize(gameHost)}`,
-            `frameSize ${formatElementSize(gameFrame)}`,
-            `canvasSize ${getInnerCanvasSize()}`
-        ].join("\n");
-    }
-
-    setInterval(updatePwaDebug, 300);
-    window.addEventListener("resize", updatePwaDebug);
-    window.addEventListener("orientationchange", updatePwaDebug);
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", updatePwaDebug);
-    }
-    updatePwaDebug();
-
     if (window.ResizeObserver) {
         const shellResizeObserver = new ResizeObserver(function() {
             updateHostViewportMode();
@@ -482,7 +400,6 @@
                 const host = getGameHostState();
 
                 updateHostViewportMode();
-                bootState = host.width > host.height ? "host-settling" : "waiting-host";
 
                 if (host.key !== stableKey) {
                     stableKey = host.key;
@@ -490,13 +407,11 @@
                 }
 
                 if (host.width > host.height && now - stableStartedAt >= stableMs) {
-                    bootState = "loading-game";
                     finish();
                     return;
                 }
 
                 if (now - startedAt >= timeoutMs) {
-                    bootState = "loading-game-timeout";
                     finish();
                     return;
                 }
@@ -522,7 +437,6 @@
         if (gameFrame) {
             gameFrame.remove();
         }
-        bootState = "game-loaded";
 
         const gameHost = document.getElementById("gameHost");
         gameFrame = document.createElement("iframe");

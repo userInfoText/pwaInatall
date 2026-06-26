@@ -58,14 +58,15 @@
         // 根据 channel 参数设置 manifest 链接
         (function() {
             var channel = getChannelParam();
+            var cacheBust = Date.now().toString();
             //打印channel
             console.log("channel:", channel);
             var manifestLink = document.getElementById('manifest-link');
             if(getIsTestParam() === '1'){
                 //测试版
-                manifestLink.href = `manifest/${channel}/installmanifest_test.json`;
+                manifestLink.href = `manifest/${channel}/installmanifest_test.json?v=${cacheBust}`;
             }else{
-                manifestLink.href = `manifest/${channel}/installmanifest.json`;
+                manifestLink.href = `manifest/${channel}/installmanifest.json?v=${cacheBust}`;
             }
             
         })();
@@ -337,7 +338,7 @@
 
             // 注册 Service Worker
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('service-worker.js')
+                navigator.serviceWorker.register('service-worker.js?v=' + Date.now())
                     .then(() => console.log("Service Worker 注册成功"))
                     .catch(err => console.error("Service Worker 注册失败", err));
             }

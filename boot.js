@@ -5,10 +5,12 @@ function urlParse() {
     if (window.location == null) {
         return params;
     }
-    var name, value;
-    var str = window.location.href.split('#')[0];//取得整个地址栏
-    var num = str.indexOf("?")
-    str = str.substr(num + 1); //取得所有参数   stringvar.substr(start [, length ]
+    var name, value, num;
+    var str = window.location.search;
+    if (!str || str.length <= 1) {
+        return params;
+    }
+    str = str.substr(1);
 
     var arr = str.split("&"); //各个参数放到数组里
     for (var i = 0; i < arr.length; i++) {
